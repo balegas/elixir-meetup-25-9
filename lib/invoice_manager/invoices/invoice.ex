@@ -9,6 +9,7 @@ defmodule InvoiceManager.Invoices.Invoice do
     field :amount, :decimal
     field :due_day, :integer
     field :description, :string
+    field :file_path, :string
 
     has_many :monthly_invoices, InvoiceManager.Invoices.MonthlyInvoice
 
@@ -20,7 +21,7 @@ defmodule InvoiceManager.Invoices.Invoice do
     attrs = parse_tags(attrs)
 
     invoice
-    |> cast(attrs, [:name, :is_recurring, :tags, :amount, :due_day, :description])
+    |> cast(attrs, [:name, :is_recurring, :tags, :amount, :due_day, :description, :file_path])
     |> validate_required([:name])
     |> validate_length(:name, min: 1, max: 255)
     |> validate_number(:amount, greater_than_or_equal_to: 0)
