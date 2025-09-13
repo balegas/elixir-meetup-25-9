@@ -3,6 +3,8 @@ defmodule InvoiceManagerWeb.InvoiceLive do
   alias InvoiceManager.Invoices
   alias InvoiceManager.Invoices.Invoice
   alias InvoiceManager.FileUpload
+  # Added this line
+  require Logger
 
   @impl true
   def mount(_params, _session, socket) do
@@ -101,16 +103,22 @@ defmodule InvoiceManagerWeb.InvoiceLive do
   def handle_event("download_file", %{"id" => invoice_id}, socket) do
     invoice = Invoices.get_invoice!(invoice_id)
 
-    if invoice.file_path do
-      case FileUpload.get_download_url(invoice.file_path) do
-        {:ok, url} ->
-          {:noreply, push_event(socket, "download", %{url: url})}
+    case invoice.file_path do
+      nil ->
+        {:noreply, put_flash(socket, :error, "No file attached to this invoice")}
 
-        {:error, _reason} ->
-          {:noreply, put_flash(socket, :error, "Could not generate download link")}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "No file attached to this invoice")}
+      file_path ->
+        case FileUpload.get_download_url(file_path) do
+          {:ok, download_url} ->
+            {:noreply, push_event(socket, "download", %{url: download_url})}
+
+          {:error, reason} ->
+            Logger.error(
+              "Failed to generate download URL for invoice #{invoice_id}: #{inspect(reason)}"
+            )
+
+            {:noreply, put_flash(socket, :error, "Download failed: #{reason}")}
+        end
     end
   end
 
