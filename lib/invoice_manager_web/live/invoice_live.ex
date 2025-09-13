@@ -2,6 +2,7 @@ defmodule InvoiceManagerWeb.InvoiceLive do
   use InvoiceManagerWeb, :live_view
   alias InvoiceManager.Invoices
   alias InvoiceManager.Invoices.Invoice
+  alias InvoiceManager.FileUpload
 
   @impl true
   def mount(_params, _session, socket) do
@@ -43,7 +44,7 @@ defmodule InvoiceManagerWeb.InvoiceLive do
     case Invoices.create_invoice(invoice_params) do
       {:ok, invoice} ->
         # Handle file upload if present
-        socket = handle_file_upload(socket, invoice)
+        updated_invoice = handle_file_upload(socket, invoice)
 
         invoices = Invoices.list_invoices()
         recurring_invoices = Invoices.list_recurring_invoices()
@@ -87,39 +88,53 @@ defmodule InvoiceManagerWeb.InvoiceLive do
   end
 
   @impl true
-  def handle_event("validate_upload", _, socket) do
+  def handle_event("cancel-upload", %{"ref" => ref}, socket) do
+    {:noreply, cancel_upload(socket, :invoice_file, ref)}
+  end
+
+  @impl true
+  def handle_event("validate", _, socket) do
     {:noreply, socket}
   end
 
+  @impl true
+  def handle_event("download_file", %{"id" => invoice_id}, socket) do
+    invoice = Invoices.get_invoice!(invoice_id)
+
+    if invoice.file_path do
+      case FileUpload.get_download_url(invoice.file_path) do
+        {:ok, url} ->
+          {:noreply, push_event(socket, "download", %{url: url})}
+
+        {:error, _reason} ->
+          {:noreply, put_flash(socket, :error, "Could not generate download link")}
+      end
+    else
+      {:noreply, put_flash(socket, :error, "No file attached to this invoice")}
+    end
+  end
+
   defp handle_file_upload(socket, invoice) do
-    consume_uploaded_entries(socket, :invoice_file, fn %{path: path}, entry ->
-      # Create month directory
-      now = DateTime.utc_now()
+    uploaded_files =
+      consume_uploaded_entries(socket, :invoice_file, fn %{path: _path} = entry, _upload ->
+        case FileUpload.upload_invoice_file(entry, invoice) do
+          {:ok, file_path} ->
+            # Update the invoice with the file path
+            case Invoices.update_invoice(invoice, %{file_path: file_path}) do
+              {:ok, updated_invoice} -> {:ok, updated_invoice}
+              {:error, _changeset} -> {:postpone, :error}
+            end
 
-      month_dir =
-        "priv/static/uploads/invoices/#{now.year}/#{String.pad_leading("#{now.month}", 2, "0")}"
+          {:error, reason} ->
+            {:postpone, reason}
+        end
+      end)
 
-      File.mkdir_p!(month_dir)
-
-      # Generate filename
-      extension = Path.extname(entry.client_name)
-
-      filename =
-        "#{invoice.name}_#{now.year}_#{String.pad_leading("#{now.month}", 2, "0")}#{extension}"
-
-      dest_path = Path.join(month_dir, filename)
-
-      # Copy file
-      File.cp!(path, dest_path)
-
-      # Return the relative path for storage
-      relative_path =
-        "/uploads/invoices/#{now.year}/#{String.pad_leading("#{now.month}", 2, "0")}/#{filename}"
-
-      {:ok, relative_path}
-    end)
-
-    socket
+    case uploaded_files do
+      [updated_invoice] -> updated_invoice
+      [] -> invoice
+      _ -> invoice
+    end
   end
 
   defp format_currency(nil), do: ""
