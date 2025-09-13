@@ -27,7 +27,7 @@ defmodule InvoiceManager.Repo.Migrations.CreateInvoicesAndMonthlyInvoices do
 
     create index(:invoices, [:name])
     create index(:invoices, [:is_recurring])
-    create index(:invoices, [:tags], using: :gin)
+    create index(:invoices, [:tags])
     create index(:monthly_invoices, [:invoice_id])
     create index(:monthly_invoices, [:month, :year])
     create index(:monthly_invoices, [:paid])
