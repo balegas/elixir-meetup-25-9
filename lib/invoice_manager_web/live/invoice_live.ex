@@ -142,10 +142,4 @@ defmodule InvoiceManagerWeb.InvoiceLive do
   defp format_currency(amount) do
     "$#{:erlang.float_to_binary(Decimal.to_float(amount), decimals: 2)}"
   end
-
-  defp format_tags([]), do: ""
-
-  defp format_tags(tags) when is_list(tags) do
-    Enum.join(tags, ", ")
-  end
 end
