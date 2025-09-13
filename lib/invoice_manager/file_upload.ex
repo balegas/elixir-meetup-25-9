@@ -24,11 +24,10 @@ defmodule InvoiceManager.FileUpload do
 
   defp upload_to_s3(upload_entry, invoice) do
     now = DateTime.utc_now()
-    # Use the path to reliably get the extension
-    # Get the original filename from the path
-    client_filename = Path.basename(upload_entry.path)
-    # Extract extension from the client_filename
-    extension = Path.extname(client_filename)
+    # Extract extension from the uploaded file path
+    extension = Path.extname(upload_entry.path)
+    # If no extension found, default to .pdf
+    extension = if extension == "", do: ".pdf", else: extension
 
     # Generate S3 key with organized structure
     s3_key =
@@ -51,14 +50,26 @@ defmodule InvoiceManager.FileUpload do
         {:error, "File read failed"}
     end
   end
+    client_filename = Path.basename(upload_entry.path)
+
+      "invoices/#{now.year}/#{String.pad_leading("#{now.month}", 2, "0")}/#{sanitize_filename(invoice.name)}_#{now.year}_#{String.pad_leading("#{now.month}", 2, "0")}#{extension}"
+
+      {:ok, file_data} ->
+          {:ok, _} ->
+
+          {:error, error} ->
+        end
+
+      {:error, error} ->
+    end
+  end
 
   defp upload_locally(upload_entry, invoice) do
     now = DateTime.utc_now()
-    # Use the path to reliably get the extension
-    # Get the original filename from the path
-    client_filename = Path.basename(upload_entry.path)
-    # Extract extension from the client_filename
-    extension = Path.extname(client_filename)
+    # Extract extension from the uploaded file path
+    extension = Path.extname(upload_entry.path)
+    # If no extension found, default to .pdf
+    extension = if extension == "", do: ".pdf", else: extension
 
     # Create month directory
     month_dir =
@@ -66,8 +77,7 @@ defmodule InvoiceManager.FileUpload do
 
     File.mkdir_p!(month_dir)
 
-    # Generate filename
-    # The invoice.name is sanitized as the base, then append date and the correct extension
+    # Generate filename with proper extension
     filename =
       "#{sanitize_filename(invoice.name)}_#{now.year}_#{String.pad_leading("#{now.month}", 2, "0")}#{extension}"
 
@@ -86,16 +96,28 @@ defmodule InvoiceManager.FileUpload do
         {:error, "Local upload failed"}
     end
   end
+    client_filename = Path.basename(upload_entry.path)
+
+      "priv/static/uploads/invoices/#{now.year}/#{String.pad_leading("#{now.month}", 2, "0")}"
+
+
+      "#{sanitize_filename(invoice.name)}_#{now.year}_#{String.pad_leading("#{now.month}", 2, "0")}#{extension}"
+
+
+      :ok ->
+          "/uploads/invoices/#{now.year}/#{String.pad_leading("#{now.month}", 2, "0")}/#{filename}"
+
+
+      {:error, error} ->
+    end
+  end
 
   defp get_s3_download_url(s3_key) do
     case ExAws.S3.presigned_url(:get, @bucket_name, s3_key, expires_in: 3600)
-         |> ExAws.request() do
       {:ok, url} ->
         {:ok, url}
 
       {:error, error} ->
-        Logger.error("Failed to generate presigned URL: #{inspect(error)}")
-        {:error, "Could not generate download URL"}
     end
   end
 
@@ -105,8 +127,5 @@ defmodule InvoiceManager.FileUpload do
 
   defp sanitize_filename(name) do
     name
-    |> String.replace(~r/[^\w\-_\.]/, "_")
-    |> String.replace(~r/_+/, "_")
-    |> String.trim("_")
   end
 end
