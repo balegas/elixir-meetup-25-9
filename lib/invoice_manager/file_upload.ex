@@ -24,7 +24,11 @@ defmodule InvoiceManager.FileUpload do
 
   defp upload_to_s3(upload_entry, invoice) do
     now = DateTime.utc_now()
-    extension = Path.extname(upload_entry.client_name)
+    # Use the path to reliably get the extension
+    # Get the original filename from the path
+    client_filename = Path.basename(upload_entry.path)
+    # Extract extension from the client_filename
+    extension = Path.extname(client_filename)
 
     # Generate S3 key with organized structure
     s3_key =
@@ -50,7 +54,11 @@ defmodule InvoiceManager.FileUpload do
 
   defp upload_locally(upload_entry, invoice) do
     now = DateTime.utc_now()
-    extension = Path.extname(upload_entry.client_name)
+    # Use the path to reliably get the extension
+    # Get the original filename from the path
+    client_filename = Path.basename(upload_entry.path)
+    # Extract extension from the client_filename
+    extension = Path.extname(client_filename)
 
     # Create month directory
     month_dir =
@@ -59,11 +67,13 @@ defmodule InvoiceManager.FileUpload do
     File.mkdir_p!(month_dir)
 
     # Generate filename
+    # The invoice.name is sanitized as the base, then append date and the correct extension
     filename =
       "#{sanitize_filename(invoice.name)}_#{now.year}_#{String.pad_leading("#{now.month}", 2, "0")}#{extension}"
 
     dest_path = Path.join(month_dir, filename)
 
+    # upload_entry.path is the source
     case File.cp(upload_entry.path, dest_path) do
       :ok ->
         relative_path =
