@@ -10,10 +10,10 @@ Monthly invoice tracker with file uploads, recurring invoice management, and pay
 - [ ] Create database schemas and migrations:
   - Invoice schema (name, file_path, is_recurring, tags, amount, due_date)
   - MonthlyInvoice schema (invoice_id, month, year, paid, paid_date)
-- [ ] Implement simple password authentication:
-  - Auth plug with env var password check
-  - Session management to keep user logged in
-  - Login page with password form
+- [x] Implement simple password authentication:
+  - [x] Auth plug with env var password check
+  - [x] Session management to keep user logged in
+  - [x] Login page with password form
 - [ ] Create file upload system:
   - Drag & drop file uploads
   - Auto-organize by month: `/priv/static/uploads/invoices/YYYY/MM/`
