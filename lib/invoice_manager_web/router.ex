@@ -17,6 +17,16 @@ defmodule InvoiceManagerWeb.Router do
   scope "/", InvoiceManagerWeb do
     pipe_through :browser
 
+    # Login routes (no auth required)
+    get "/login", AuthController, :login
+    post "/login", AuthController, :login
+    get "/logout", AuthController, :logout
+  end
+
+  # Protected routes
+  scope "/", InvoiceManagerWeb do
+    pipe_through [:browser, InvoiceManagerWeb.AuthPlug]
+
     get "/", PageController, :home
   end
 
