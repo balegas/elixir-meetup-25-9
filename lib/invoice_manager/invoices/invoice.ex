@@ -18,6 +18,7 @@ defmodule InvoiceManager.Invoices.Invoice do
   @doc false
   def changeset(invoice, attrs) do
     attrs = parse_tags(attrs)
+
     invoice
     |> cast(attrs, [:name, :is_recurring, :tags, :amount, :due_day, :description])
     |> validate_required([:name])
@@ -29,7 +30,7 @@ defmodule InvoiceManager.Invoices.Invoice do
   end
 
   defp parse_tags(%{"tags" => tags} = attrs) when is_binary(tags) do
-    parsed_tags = 
+    parsed_tags =
       tags
       |> String.split(",")
       |> Enum.map(&String.trim/1)
@@ -39,6 +40,4 @@ defmodule InvoiceManager.Invoices.Invoice do
   end
 
   defp parse_tags(attrs), do: attrs
-
-end
 end
