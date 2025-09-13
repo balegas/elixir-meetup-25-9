@@ -27,7 +27,7 @@ defmodule InvoiceManagerWeb.Router do
   scope "/", InvoiceManagerWeb do
     pipe_through [:browser, InvoiceManagerWeb.AuthPlug]
 
-    get "/", PageController, :home
+    live "/", InvoiceLive
   end
 
   # Other scopes may use custom stacks.
