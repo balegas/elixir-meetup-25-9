@@ -50,19 +50,6 @@ defmodule InvoiceManager.FileUpload do
         {:error, "File read failed"}
     end
   end
-    client_filename = Path.basename(upload_entry.path)
-
-      "invoices/#{now.year}/#{String.pad_leading("#{now.month}", 2, "0")}/#{sanitize_filename(invoice.name)}_#{now.year}_#{String.pad_leading("#{now.month}", 2, "0")}#{extension}"
-
-      {:ok, file_data} ->
-          {:ok, _} ->
-
-          {:error, error} ->
-        end
-
-      {:error, error} ->
-    end
-  end
 
   defp upload_locally(upload_entry, invoice) do
     now = DateTime.utc_now()
@@ -96,28 +83,15 @@ defmodule InvoiceManager.FileUpload do
         {:error, "Local upload failed"}
     end
   end
-    client_filename = Path.basename(upload_entry.path)
-
-      "priv/static/uploads/invoices/#{now.year}/#{String.pad_leading("#{now.month}", 2, "0")}"
-
-
-      "#{sanitize_filename(invoice.name)}_#{now.year}_#{String.pad_leading("#{now.month}", 2, "0")}#{extension}"
-
-
-      :ok ->
-          "/uploads/invoices/#{now.year}/#{String.pad_leading("#{now.month}", 2, "0")}/#{filename}"
-
-
-      {:error, error} ->
-    end
-  end
 
   defp get_s3_download_url(s3_key) do
-    case ExAws.S3.presigned_url(:get, @bucket_name, s3_key, expires_in: 3600)
+    case ExAws.S3.presigned_url(:get, @bucket_name, s3_key, expires_in: 3600) do
       {:ok, url} ->
         {:ok, url}
 
       {:error, error} ->
+        Logger.error("Failed to generate S3 presigned URL: #{inspect(error)}")
+        {:error, "Download URL generation failed"}
     end
   end
 
