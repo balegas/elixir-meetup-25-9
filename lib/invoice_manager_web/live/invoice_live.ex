@@ -44,7 +44,7 @@ defmodule InvoiceManagerWeb.InvoiceLive do
     case Invoices.create_invoice(invoice_params) do
       {:ok, invoice} ->
         # Handle file upload if present
-        updated_invoice = handle_file_upload(socket, invoice)
+        _updated_invoice = handle_file_upload(socket, invoice)
 
         invoices = Invoices.list_invoices()
         recurring_invoices = Invoices.list_recurring_invoices()
