@@ -6,8 +6,12 @@ import Config
 # to provide built-in test partitioning in CI environment.
 # Run `mix help test` for more information.
 config :invoice_manager, InvoiceManager.Repo,
-  database: Path.expand("../invoice_manager_test.db", __DIR__),
-  pool_size: 5,
+  username: "postgres",
+  password: "postgres",
+  hostname: "localhost",
+  port: 54321,
+  database: "invoice_manager_test#{System.get_env("MIX_TEST_PARTITION")}",
+  pool_size: 10,
   pool: Ecto.Adapters.SQL.Sandbox
 
 # We don't run a server during test. If one is required,

@@ -2,8 +2,12 @@ import Config
 
 # Configure your database
 config :invoice_manager, InvoiceManager.Repo,
-  database: Path.expand("../invoice_manager_dev.db", __DIR__),
-  pool_size: 5,
+  username: "postgres",
+  password: "postgres",
+  hostname: "localhost",
+  port: 54321,
+  database: "invoice_manager_dev",
+  pool_size: 10,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true
 
