@@ -9,12 +9,10 @@ defmodule InvoiceManagerWeb.InvoiceLive do
   @impl true
   def mount(_params, _session, socket) do
     invoices = Invoices.list_invoices()
-    recurring_invoices = Invoices.list_recurring_invoices()
 
     {:ok,
      socket
-     |> assign(:invoices, invoices)
-     |> assign(:recurring_invoices, recurring_invoices)
+     |> stream(:invoices, invoices)
      |> assign(:filters, %{})
      |> assign(:form, to_form(Invoices.change_invoice(%Invoice{})))
      |> assign(:show_form, false)
@@ -46,15 +44,11 @@ defmodule InvoiceManagerWeb.InvoiceLive do
     case Invoices.create_invoice(invoice_params) do
       {:ok, invoice} ->
         # Handle file upload if present
-        _updated_invoice = handle_file_upload(socket, invoice)
-
-        invoices = Invoices.list_invoices()
-        recurring_invoices = Invoices.list_recurring_invoices()
+        updated_invoice = handle_file_upload(socket, invoice)
 
         {:noreply,
          socket
-         |> assign(:invoices, invoices)
-         |> assign(:recurring_invoices, recurring_invoices)
+         |> stream_insert(:invoices, updated_invoice)
          |> assign(:form, to_form(Invoices.change_invoice(%Invoice{})))
          |> assign(:show_form, false)
          |> put_flash(:info, "Invoice created successfully!")}
@@ -70,7 +64,7 @@ defmodule InvoiceManagerWeb.InvoiceLive do
 
     {:noreply,
      socket
-     |> assign(:invoices, invoices)
+     |> stream(:invoices, invoices, reset: true)
      |> assign(:filters, filters)}
   end
 
@@ -79,13 +73,9 @@ defmodule InvoiceManagerWeb.InvoiceLive do
     invoice = Invoices.get_invoice!(id)
     {:ok, _} = Invoices.delete_invoice(invoice)
 
-    invoices = Invoices.list_invoices(socket.assigns.filters)
-    recurring_invoices = Invoices.list_recurring_invoices()
-
     {:noreply,
      socket
-     |> assign(:invoices, invoices)
-     |> assign(:recurring_invoices, recurring_invoices)
+     |> stream_delete(:invoices, invoice)
      |> put_flash(:info, "Invoice deleted successfully!")}
   end
 

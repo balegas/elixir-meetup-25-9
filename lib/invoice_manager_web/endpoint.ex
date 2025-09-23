@@ -50,5 +50,10 @@ defmodule InvoiceManagerWeb.Endpoint do
   plug Plug.MethodOverride
   plug Plug.Head
   plug Plug.Session, @session_options
+
+  # Only in DEV
+  plug CORSPlug,
+    origin: "*"
+
   plug InvoiceManagerWeb.Router
 end

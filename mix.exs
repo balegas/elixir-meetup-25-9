@@ -61,7 +61,10 @@ defmodule InvoiceManager.MixProject do
       {:bandit, "~> 1.5"},
       {:ex_aws, "~> 2.1"},
       {:ex_aws_s3, "~> 2.0"},
-      {:hackney, "~> 1.9"}
+      {:hackney, "~> 1.9"},
+      {:electric, "~> 1.0"},
+      {:phoenix_sync, "~> 0.6"},
+      {:cors_plug, "~> 3.0"}
     ]
   end
 
