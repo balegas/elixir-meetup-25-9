@@ -41,6 +41,11 @@ config :logger, :default_formatter,
 
 config :phoenix, :json_library, Jason
 
+config :phoenix_sync,
+  env: config_env(),
+  mode: :embedded,
+  repo: InvoiceManager.Repo
+
 import_config "fly_storage.exs"
 
 import_config "#{config_env()}.exs"

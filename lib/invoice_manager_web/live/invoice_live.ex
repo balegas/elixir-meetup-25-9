@@ -1,5 +1,6 @@
 defmodule InvoiceManagerWeb.InvoiceLive do
   use InvoiceManagerWeb, :live_view
+  import Phoenix.Sync.LiveView
   alias InvoiceManager.Invoices
   alias InvoiceManager.Invoices.Invoice
   alias InvoiceManager.FileUpload
@@ -7,11 +8,11 @@ defmodule InvoiceManagerWeb.InvoiceLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    invoices = Invoices.list_invoices()
-
     {:ok,
      socket
-     |> stream(:invoices, invoices)
+     |> sync_stream(:invoices, Invoice)
+     # or with a where clause
+     # |> sync_stream(:invoices, from(i in Invoice, where: i.is_recurring == true))
      |> assign(:filters, %{})
      |> assign(:form, to_form(Invoices.change_invoice(%Invoice{})))
      |> assign(:show_form, false)
@@ -42,11 +43,10 @@ defmodule InvoiceManagerWeb.InvoiceLive do
   def handle_event("save_invoice", %{"invoice" => invoice_params}, socket) do
     case Invoices.create_invoice(invoice_params) do
       {:ok, invoice} ->
-        updated_invoice = handle_file_upload(socket, invoice)
+        handle_file_upload(socket, invoice)
 
         {:noreply,
          socket
-         |> stream_insert(:invoices, updated_invoice)
          |> assign(:form, to_form(Invoices.change_invoice(%Invoice{})))
          |> assign(:show_form, false)
          |> put_flash(:info, "Invoice created successfully!")}
@@ -58,11 +58,8 @@ defmodule InvoiceManagerWeb.InvoiceLive do
 
   @impl true
   def handle_event("filter", %{"filters" => filters}, socket) do
-    invoices = Invoices.list_invoices(filters)
-
     {:noreply,
      socket
-     |> stream(:invoices, invoices, reset: true)
      |> assign(:filters, filters)}
   end
 
@@ -73,7 +70,6 @@ defmodule InvoiceManagerWeb.InvoiceLive do
 
     {:noreply,
      socket
-     |> stream_delete(:invoices, invoice)
      |> put_flash(:info, "Invoice deleted successfully!")}
   end
 
@@ -130,6 +126,11 @@ defmodule InvoiceManagerWeb.InvoiceLive do
       [] -> invoice
       _ -> invoice
     end
+  end
+
+  @impl true
+  def handle_info({:sync, event}, socket) do
+    {:noreply, sync_stream_update(socket, event)}
   end
 
   defp format_currency(nil), do: ""

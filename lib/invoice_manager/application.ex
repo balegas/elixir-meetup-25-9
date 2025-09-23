@@ -17,7 +17,7 @@ defmodule InvoiceManager.Application do
       # Start a worker by calling: InvoiceManager.Worker.start_link(arg)
       # {InvoiceManager.Worker, arg},
       # Start to serve requests, typically the last entry
-      InvoiceManagerWeb.Endpoint
+      {InvoiceManagerWeb.Endpoint, phoenix_sync: Phoenix.Sync.plug_opts()}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
