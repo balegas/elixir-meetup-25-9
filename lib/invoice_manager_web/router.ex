@@ -1,5 +1,7 @@
 defmodule InvoiceManagerWeb.Router do
   use InvoiceManagerWeb, :router
+  import Phoenix.Sync.Router
+  alias InvoiceManager.Invoices.Invoice
 
   pipeline :browser do
     plug :accepts, ["html"]
@@ -14,6 +16,11 @@ defmodule InvoiceManagerWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :shapes do
+    plug :accepts, ["json"]
+    plug :fetch_session
+  end
+
   scope "/", InvoiceManagerWeb do
     pipe_through :browser
 
@@ -26,6 +33,12 @@ defmodule InvoiceManagerWeb.Router do
     pipe_through [:browser, InvoiceManagerWeb.AuthPlug]
 
     live "/", InvoiceLive
+  end
+
+  scope "/shapes" do
+    pipe_through [:shapes, InvoiceManagerWeb.AuthPlug]
+
+    sync "/invoices", Invoice # optional where clause
   end
 
   if Application.compile_env(:invoice_manager, :dev_routes) do
