@@ -3,7 +3,6 @@ defmodule InvoiceManagerWeb.InvoiceLive do
   alias InvoiceManager.Invoices
   alias InvoiceManager.Invoices.Invoice
   alias InvoiceManager.FileUpload
-  # Added this line
   require Logger
 
   @impl true
@@ -43,7 +42,6 @@ defmodule InvoiceManagerWeb.InvoiceLive do
   def handle_event("save_invoice", %{"invoice" => invoice_params}, socket) do
     case Invoices.create_invoice(invoice_params) do
       {:ok, invoice} ->
-        # Handle file upload if present
         updated_invoice = handle_file_upload(socket, invoice)
 
         {:noreply,
@@ -117,7 +115,6 @@ defmodule InvoiceManagerWeb.InvoiceLive do
       consume_uploaded_entries(socket, :invoice_file, fn %{path: _path} = entry, _upload ->
         case FileUpload.upload_invoice_file(entry, invoice) do
           {:ok, file_path} ->
-            # Update the invoice with the file path
             case Invoices.update_invoice(invoice, %{file_path: file_path}) do
               {:ok, updated_invoice} -> {:ok, updated_invoice}
               {:error, _changeset} -> {:postpone, :error}
