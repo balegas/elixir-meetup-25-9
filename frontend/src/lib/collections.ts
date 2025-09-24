@@ -2,13 +2,18 @@ import { createCollection, createOptimisticAction } from "@tanstack/react-db";
 import { electricCollectionOptions } from "@tanstack/electric-db-collection";
 import { config } from "../config";
 import { createAuthHeader } from "./auth";
-import { type Invoice } from "./schema";
+import { type Invoice, invoiceSchema } from "./schema";
 
-// Create the invoices collection using Electric
+import type { ElectricCollectionUtils } from "@tanstack/electric-db-collection";
+
+// Keep a small cache to store originals for delete mutations captured during onMutate
+const originalInvoiceById = new Map<string, Invoice>();
+
+// Create the invoices collection without mutation handlers
 export const invoicesCollection = createCollection(
-  electricCollectionOptions<Invoice>({
+  electricCollectionOptions({
     id: "invoices",
-    getKey: (item) => item.id,
+    getKey: (item: Invoice) => item.id.toString(),
     shapeOptions: {
       url: `${config.api.baseUrl}/shapes/invoices`,
       headers: {
@@ -19,119 +24,100 @@ export const invoicesCollection = createCollection(
   })
 );
 
-// Optimistic action for creating invoices
+// API function for sending mutations to backend
+async function sendMutations(mutations: any[]) {
+  const response = await fetch(`${config.api.baseUrl}/writes/ingest`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: createAuthHeader(),
+      Accept: "application/json",
+    },
+    body: JSON.stringify({ mutations }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(
+      errorData.error
+        ? JSON.stringify(errorData.error)
+        : "Failed to ingest mutations"
+    );
+  }
+
+  const result = await response.json();
+  return parseInt(result.txid);
+}
+
+// How to handle other types of mutations
+// https://github.com/electric-sql/phoenix_sync/blob/main/lib/phoenix/sync/writer/format/tanstack_db.ex
 export const createInvoiceAction = createOptimisticAction({
-  onMutate: (vars: unknown) => {
-    const { invoiceData } = vars as { invoiceData: any };
+  onMutate: ({ invoiceData }: { invoiceData: Invoice }) => {
+    const result = invoiceSchema.safeParse(invoiceData);
+    if (!result.success) {
+      throw new Error("Invalid invoice data");
+    }
 
-    // Generate a temporary ID for optimistic update
-    const randomId = Math.random().toString(36).substring(2, 15);
-    const now = new Date().toISOString();
-
-    // Prepare optimistic data
-    const optimisticInvoice: Invoice = {
-      id: randomId,
+    invoicesCollection.insert({
+      id: crypto.randomUUID(),
       name: invoiceData.name,
-      is_recurring: invoiceData.is_recurring.toString(),
+      is_recurring: invoiceData.is_recurring,
       tags: invoiceData.tags,
-      amount: invoiceData.amount ? invoiceData.amount.toString() : null,
+      amount: invoiceData.amount,
       due_day: invoiceData.due_day,
       description: invoiceData.description,
       file_path: null,
-      inserted_at: now,
-      updated_at: now,
-    };
-    invoicesCollection.insert(optimisticInvoice);
+      inserted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
   },
 
-  mutationFn: async (vars: unknown) => {
-    const { invoiceData } = vars as { invoiceData: any };
-
-    const response = await fetch(`${config.api.baseUrl}/writes/invoices`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: createAuthHeader(),
-        Accept: "application/json",
+  mutationFn: async ({ invoiceData }: { invoiceData: Invoice }) => {
+    // Build the mutation in the format that the backend expects
+    const mutation = {
+      modified: invoiceData,
+      syncMetadata: {
+        relation: ["public", "invoices"],
       },
-      body: JSON.stringify({
-        transaction: {
-          mutations: [
-            {
-              type: "insert",
-              id: invoiceData.id,
-              table: "invoices",
-              data: invoiceData,
-            },
-          ],
-        },
-      }),
-    });
+      type: "insert",
+    };
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(
-        errorData.errors
-          ? JSON.stringify(errorData.errors)
-          : "Failed to create invoice"
-      );
-    }
+    const txid = await sendMutations([mutation]);
 
-    const createdInvoice = await response.json();
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    // Wait for the transaction to be synchronized
+    await(invoicesCollection.utils as ElectricCollectionUtils).awaitTxId(txid);
 
-    return createdInvoice;
+    return { txid };
   },
 });
 
-// Optimistic action for deleting invoices
 export const deleteInvoiceAction = createOptimisticAction({
-  onMutate: (vars: unknown) => {
-    const { invoiceId } = vars as { invoiceId: string };
-
-    // Optimistically delete the invoice
-    invoicesCollection.delete(invoiceId);
-
-    return { invoiceId };
+  onMutate: ({ invoiceData }: { invoiceData: Invoice }) => {
+    invoicesCollection.delete(invoiceData.id);
   },
 
-  mutationFn: async (vars: unknown) => {
-    const { invoiceId } = vars as { invoiceId: string };
-
-    const response = await fetch(
-      `${config.api.baseUrl}/writes/invoices/${invoiceId}`,
-      {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: createAuthHeader(),
-          Accept: "application/json",
+  mutationFn: async ({ invoiceData }: { invoiceData: Invoice }) => {
+    try {
+      const mutation = {
+        original: invoiceData,
+        syncMetadata: {
+          relation: ["public", "invoices"],
         },
-        body: JSON.stringify({
-          transaction: {
-            mutations: [
-              {
-                type: "delete",
-                id: invoiceId,
-                table: "invoices",
-              },
-            ],
-          },
-        }),
-      }
-    );
+        type: "delete",
+      };
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(
-        errorData.errors
-          ? JSON.stringify(errorData.errors)
-          : "Failed to delete invoice"
+      const txid = await sendMutations([mutation]);
+
+      await (invoicesCollection.utils as ElectricCollectionUtils).awaitTxId(
+        txid
       );
-    }
 
-    const result = await response.json();
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    return result;
+      // Cleanup captured original
+      originalInvoiceById.delete(invoiceData.id);
+
+      return { txid };
+    } catch (error) {
+      throw new Error("Failed to delete invoice");
+    }
   },
 });

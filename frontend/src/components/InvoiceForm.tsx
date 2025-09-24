@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createInvoiceAction } from "../lib/collections";
-import { createInvoice } from "../lib/validation";
+import { invoiceSchema } from "../lib/schema";
 
 interface InvoiceFormProps {
   onClose: () => void;
@@ -8,66 +8,80 @@ interface InvoiceFormProps {
 }
 
 interface FormData {
-  name: string;
+  name?: string;
   is_recurring: boolean;
   tags: string;
-  amount: string;
+  amount?: number;
   due_day: string;
   description: string;
 }
 
 export function InvoiceForm({ onClose, onSuccess }: InvoiceFormProps) {
   const [formData, setFormData] = useState<FormData>({
-    name: "",
     is_recurring: false,
     tags: "",
-    amount: "",
     due_day: "",
     description: "",
   });
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [globalError, setGlobalError] = useState<string>("");
 
   const handleInputChange = (
     field: keyof FormData,
     value: string | boolean
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    setErrors((prev) => {
-      const next = { ...prev };
-      if (next[field as string]) {
-        delete next[field as string];
-      }
-      return next;
-    });
+    setGlobalError(""); // Clear global error on input change
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Build payload in the exact shape expected by the API and schema
+    if (!formData.name) {
+      setGlobalError("Name is required");
+      return;
+    }
+    if (!formData.amount) {
+      setGlobalError("Amount is required");
+      return;
+    }
+
+    // Validate with Zod schema directly
+    const validationResult = invoiceSchema.safeParse({
+      id: crypto.randomUUID(),
+      name: formData.name,
+      is_recurring: formData.is_recurring.toString(),
+      tags: formData.tags
+        ? formData.tags
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean)
+        : [],
+      amount: formData.amount.toString(),
+      due_day: formData.due_day ? parseInt(formData.due_day) : null,
+      description: formData.description || null,
+      file_path: null,
+      inserted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+    if (!validationResult.success) {
+      const errorMessage = validationResult.error.message;
+      setGlobalError(errorMessage);
+      return;
+    }
+
     try {
-      const result = createInvoice({
-        name: formData.name,
-        is_recurring: formData.is_recurring,
-        tags: formData.tags,
-        amount: formData.amount,
-        due_day: formData.due_day,
-        description: formData.description,
-      });
-
-      if (!result.success) {
-        setErrors(result.errors);
-        return;
-      }
-
       // Use the optimistic action
-      createInvoiceAction({ invoiceData: result.value });
+      createInvoiceAction({
+        invoiceData: validationResult.data,
+      });
 
       onSuccess();
       onClose();
     } catch (error) {
       console.log("❌ Invoice creation failed:", error);
+      setGlobalError("Failed to create invoice. Please try again.");
     }
   };
 
@@ -76,6 +90,12 @@ export function InvoiceForm({ onClose, onSuccess }: InvoiceFormProps) {
       <h3 className="text-lg font-medium text-gray-900 mb-4">
         Add New Invoice
       </h3>
+
+      {globalError && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+          <p className="text-sm text-red-600">{globalError}</p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -88,16 +108,9 @@ export function InvoiceForm({ onClose, onSuccess }: InvoiceFormProps) {
               value={formData.name}
               onChange={(e) => handleInputChange("name", e.target.value)}
               placeholder="e.g., Electricity Bill"
-              className={`w-full px-3 py-2 border rounded-md text-sm bg-white text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 ${
-                errors.name
-                  ? "border-red-400 focus:border-red-500 focus:ring focus:ring-red-300"
-                  : "border-gray-300"
-              }`}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
               required
             />
-            {errors.name && (
-              <p className="text-sm text-red-600 mt-1">{errors.name}</p>
-            )}
           </div>
 
           <div>
@@ -110,15 +123,8 @@ export function InvoiceForm({ onClose, onSuccess }: InvoiceFormProps) {
               value={formData.amount}
               onChange={(e) => handleInputChange("amount", e.target.value)}
               placeholder="0.00"
-              className={`w-full px-3 py-2 border rounded-md text-sm bg-white text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 ${
-                errors.amount
-                  ? "border-red-400 focus:border-red-500 focus:ring focus:ring-red-300"
-                  : "border-gray-300"
-              }`}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
             />
-            {errors.amount && (
-              <p className="text-sm text-red-600 mt-1">{errors.amount}</p>
-            )}
           </div>
         </div>
 
@@ -134,15 +140,8 @@ export function InvoiceForm({ onClose, onSuccess }: InvoiceFormProps) {
               value={formData.due_day}
               onChange={(e) => handleInputChange("due_day", e.target.value)}
               placeholder="15"
-              className={`w-full px-3 py-2 border rounded-md text-sm bg-white text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 ${
-                errors.due_day
-                  ? "border-red-400 focus:border-red-500 focus:ring focus:ring-red-300"
-                  : "border-gray-300"
-              }`}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
             />
-            {errors.due_day && (
-              <p className="text-sm text-red-600 mt-1">{errors.due_day}</p>
-            )}
           </div>
 
           <div>
@@ -154,15 +153,8 @@ export function InvoiceForm({ onClose, onSuccess }: InvoiceFormProps) {
               value={formData.tags}
               onChange={(e) => handleInputChange("tags", e.target.value)}
               placeholder="utilities, monthly"
-              className={`w-full px-3 py-2 border rounded-md text-sm bg-white text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 ${
-                errors.tags
-                  ? "border-red-400 focus:border-red-500 focus:ring focus:ring-red-300"
-                  : "border-gray-300"
-              }`}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
             />
-            {errors.tags && (
-              <p className="text-sm text-red-600 mt-1">{errors.tags}</p>
-            )}
           </div>
         </div>
 
@@ -175,15 +167,8 @@ export function InvoiceForm({ onClose, onSuccess }: InvoiceFormProps) {
             onChange={(e) => handleInputChange("description", e.target.value)}
             placeholder="Optional description..."
             rows={3}
-            className={`w-full px-3 py-2 border rounded-md text-sm bg-white text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 ${
-              errors.description
-                ? "border-red-400 focus:border-red-500 focus:ring focus:ring-red-300"
-                : "border-gray-300"
-            }`}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
           />
-          {errors.description && (
-            <p className="text-sm text-red-600 mt-1">{errors.description}</p>
-          )}
         </div>
 
         <div>

@@ -41,6 +41,12 @@ defmodule InvoiceManagerWeb.Router do
     sync "/invoices", Invoice # optional where clause
   end
 
+  scope "/writes" do
+    pipe_through :shapes
+
+    post "/ingest", InvoiceManagerWeb.WriteController, :ingest
+  end
+
   if Application.compile_env(:invoice_manager, :dev_routes) do
     import Phoenix.LiveDashboard.Router
 

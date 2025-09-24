@@ -12,10 +12,13 @@ export function InvoiceList() {
   const [showForm, setShowForm] = useState(false);
 
   // Handle delete invoice
-  const handleDeleteInvoice = async (invoiceId: string) => {
+  const handleDeleteInvoice = async (invoice: Invoice) => {
     try {
-      deleteInvoiceAction({ invoiceId });
+      deleteInvoiceAction({
+        invoiceData: { ...invoice, id: invoice.id.toString() },
+      });
     } catch (error) {
+      console.error(error);
       alert("Failed to delete invoice. Please try again.");
     }
   };
@@ -32,7 +35,7 @@ export function InvoiceList() {
         return q;
       } else {
         return q.where(({ invoices }) =>
-          eq(invoices.is_recurring, filter === "recurring")
+          eq(invoices.is_recurring, filter === "recurring" ? "true" : "false")
         );
       }
     },
@@ -141,7 +144,9 @@ export function InvoiceList() {
                     <span className="text-gray-400 text-sm">No file</span>
                   )}
                   <button
-                    onClick={() => handleDeleteInvoice(invoice.id)}
+                    onClick={() => {
+                      handleDeleteInvoice(invoice);
+                    }}
                     className="text-red-600 hover:text-red-800 text-sm"
                   >
                     Delete
