@@ -35,7 +35,7 @@ export function InvoiceList() {
         return q;
       } else {
         return q.where(({ invoices }) =>
-          eq(invoices.is_recurring, filter === "recurring" ? "true" : "false")
+          eq(invoices.is_recurring as any, filter === "recurring")
         );
       }
     },
