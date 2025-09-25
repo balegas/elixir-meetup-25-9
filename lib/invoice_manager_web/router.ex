@@ -1,5 +1,7 @@
 defmodule InvoiceManagerWeb.Router do
   use InvoiceManagerWeb, :router
+  import Phoenix.Sync.Router
+  alias InvoiceManager.Invoices.Invoice
 
   pipeline :browser do
     plug :accepts, ["html"]
@@ -14,34 +16,38 @@ defmodule InvoiceManagerWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :shapes do
+    plug :accepts, ["json"]
+    plug :fetch_session
+  end
+
   scope "/", InvoiceManagerWeb do
     pipe_through :browser
 
-    # Login routes (no auth required)
     get "/login", AuthController, :login
     post "/login", AuthController, :login
     get "/logout", AuthController, :logout
   end
 
-  # Protected routes
   scope "/", InvoiceManagerWeb do
     pipe_through [:browser, InvoiceManagerWeb.AuthPlug]
 
     live "/", InvoiceLive
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", InvoiceManagerWeb do
-  #   pipe_through :api
-  # end
+  scope "/shapes" do
+    pipe_through [:shapes, InvoiceManagerWeb.AuthPlug]
 
-  # Enable LiveDashboard and Swoosh mailbox preview in development
+    sync "/invoices", Invoice # optional where clause
+  end
+
+  scope "/writes" do
+    pipe_through :shapes
+
+    post "/ingest", InvoiceManagerWeb.WriteController, :ingest
+  end
+
   if Application.compile_env(:invoice_manager, :dev_routes) do
-    # If you want to use the LiveDashboard in production, you should put
-    # it behind authentication and allow only admins to access it.
-    # If your application does not have an admins-only section yet,
-    # you can use Plug.BasicAuth to set up some basic authentication
-    # as long as you are also using SSL (which you should anyway).
     import Phoenix.LiveDashboard.Router
 
     scope "/dev" do
